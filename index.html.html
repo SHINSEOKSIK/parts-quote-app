@@ -1,77 +1,116 @@
 import { useState } from 'react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import Papa from 'papaparse'
+import { Label } from "@/components/ui/label"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+const lookup: Record<string, { 품목명: string, 규격명: string }> = {
+  '03L103469A': { 품목명: '헤드커버', 규격명: '국내X' },
+  '8K0198381BN': { 품목명: '엔진미미', 규격명: '성수' },
+  '03L103483': { 품목명: '헤드커버가스켓', 규격명: '엘링' },
+  '03L911021C': { 품목명: '스타트모터', 규격명: 'HYPERX' },
+}
 
 export default function Home() {
-  const [parts, setParts] = useState([])
+  const [rows, setRows] = useState(Array(5).fill({ partNo: '', 품목명: '', 규격명: '' }))
   const [message, setMessage] = useState('')
+  const [csvRows, setCsvRows] = useState<any[]>([])
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: function(results) {
-        const lookup = {
-          '03L103469A': { 품목명: '헤드커버', 규격명: '국내X' },
-          '8K0198381BN': { 품목명: '엔진미미', 규격명: '성수' },
-          '03L103483': { 품목명: '헤드커버가스켓', 규격명: '엘링' },
-          '03L911021C': { 품목명: '스타트모터', 규격명: 'HYPERX' },
-        }
-
-        const filledData = results.data.map((row: any) => {
-          const match = lookup[row.부품번호]
-          return {
-            ...row,
-            품목명: match?.품목명 || '',
-            규격명: match?.규격명 || '',
-          }
-        })
-
-        setParts(filledData)
-        setMessage('')
-      }
-    })
+  const handleChange = (index: number, value: string) => {
+    const match = lookup[value.trim()]
+    const updatedRows = [...rows]
+    updatedRows[index] = {
+      partNo: value,
+      품목명: match?.품목명 || '',
+      규격명: match?.규격명 || '',
+    }
+    setRows(updatedRows)
   }
 
   const handleRegister = () => {
     setMessage('입력완료 ✅')
   }
 
+  const handleCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const text = event.target?.result as string
+      const lines = text.split('\n').filter(line => line.trim() !== '')
+      const data = lines.slice(1).map(line => {
+        const [부품번호, 품목명, 규격명] = line.split(',')
+        return { 부품번호, 품목명, 규격명 }
+      })
+      setCsvRows(data)
+    }
+    reader.readAsText(file)
+  }
+
   return (
-    <div className="p-8 space-y-4">
-      <h1 className="text-2xl font-bold">부품 견적 자동입력</h1>
-      <Input type="file" accept=".csv" onChange={handleFileUpload} />
+    <div className="p-6 space-y-8">
+      <h1 className="text-2xl font-bold">부품 견적서 입력</h1>
 
-      {parts.length > 0 && (
-        <table className="w-full mt-4 border">
-          <thead className="bg-gray-200">
-            <tr>
-              <th className="border p-2">부품번호</th>
-              <th className="border p-2">품목명</th>
-              <th className="border p-2">규격명</th>
-            </tr>
-          </thead>
-          <tbody>
-            {parts.map((row: any, index) => (
-              <tr key={index}>
-                <td className="border p-2">{row.부품번호}</td>
-                <td className="border p-2">{row.품목명}</td>
-                <td className="border p-2">{row.규격명}</td>
-              </tr>
+      <div>
+        <Label className="mb-2 block">CSV 파일 업로드</Label>
+        <Input type="file" accept=".csv" onChange={handleCSV} />
+
+        {csvRows.length > 0 && (
+          <div className="mt-4">
+            <h2 className="font-semibold mb-2">CSV 불러온 데이터</h2>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>부품번호</TableHead>
+                  <TableHead>품목명</TableHead>
+                  <TableHead>규격명</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {csvRows.map((row, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell>{row.부품번호}</TableCell>
+                    <TableCell>{row.품목명}</TableCell>
+                    <TableCell>{row.규격명}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+
+      <div>
+        <h2 className="font-semibold mb-2">직접 입력</h2>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>부품번호</TableHead>
+              <TableHead>품목명</TableHead>
+              <TableHead>규격명</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row, index) => (
+              <TableRow key={index}>
+                <TableCell>
+                  <Input
+                    placeholder="부품번호"
+                    value={row.partNo}
+                    onChange={(e) => handleChange(index, e.target.value)}
+                  />
+                </TableCell>
+                <TableCell>{row.품목명}</TableCell>
+                <TableCell>{row.규격명}</TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-      )}
+          </TableBody>
+        </Table>
 
-      {parts.length > 0 && (
-        <Button onClick={handleRegister}>판매 등록</Button>
-      )}
-
-      {message && <p className="text-green-600 font-semibold mt-2">{message}</p>}
+        <Button className="mt-4" onClick={handleRegister}>판매 등록</Button>
+        {message && <p className="text-green-600 font-semibold mt-2">{message}</p>}
+      </div>
     </div>
   )
 }
